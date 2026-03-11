@@ -27,3 +27,6 @@ user-agents==2.2.0      # User agent parsing for session tracking
 pyotp==2.9.0            # TOTP/2FA implementation (RFC 6238)
 qrcode[pil]==7.4.2      # QR code generation for MFA setup
 cryptography==42.0.5    # Field-level encryption (Fernet)
+
+# Phase 4.4: Prometheus Integration
+prometheus-client==0.19.0  # Prometheus metrics exporter

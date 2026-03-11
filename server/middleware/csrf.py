@@ -33,6 +33,7 @@ CSRF_EXEMPT_PATHS = {
     "/api/v1/auth/register",   # Registro genera el token CSRF
     "/api/v1/hosts/register",  # Agentes registrando hosts
     "/api/v1/metrics/",        # Agentes enviando métricas
+    "/api/v1/metrics",         # Prometheus scraper (sin autenticación)
     "/api/v1/docker/sync",     # Agentes sincronizando Docker
     "/api/v1/commands/",       # Agentes consultando comandos pendientes
     "/api/v1/agents/generate", # Generación de API keys para agentes

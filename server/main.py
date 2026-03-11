@@ -12,6 +12,7 @@ from core.config import settings
 from core.logging_config import setup_logging, setup_encrypted_logging
 from database.database import engine, Base
 from api import api_router
+from api import prometheus as prometheus_api
 from middleware import SecurityHeadersMiddleware, RequestSizeLimitMiddleware, SecurityLoggingMiddleware, CSRFProtectionMiddleware, SessionActivityMiddleware
 
 # Phase 2.6: Setup structured logging
@@ -76,6 +77,7 @@ async def lifespan(app: FastAPI):
     )
     
     scheduler.start()
+    logger.info("✅ Scheduler started successfully")
 
     yield
 
@@ -158,7 +160,11 @@ async def block_docs_in_production(request: Request, call_next):
     response = await call_next(request)
     return response
 
+# API Routers
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Prometheus metrics endpoint (no prefix, accessible at /api/v1/metrics)
+app.include_router(prometheus_api.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root():
