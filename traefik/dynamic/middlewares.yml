@@ -1,0 +1,88 @@
+# Traefik Dynamic Configuration - Middlewares
+# https://doc.traefik.io/traefik/middlewares/overview/
+
+http:
+  middlewares:
+    # Security Headers
+    security-headers:
+      headers:
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        frameDeny: true
+        sslRedirect: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        customFrameOptionsValue: "SAMEORIGIN"
+        customResponseHeaders:
+          X-Powered-By: "LAMS"
+          Server: "Traefik"
+    
+    # Rate Limiting
+    rate-limit:
+      rateLimit:
+        average: 100
+        period: 1s
+        burst: 50
+    
+    # Rate Limiting for API
+    api-rate-limit:
+      rateLimit:
+        average: 500
+        period: 1s
+        burst: 200
+    
+    # Auth Rate Limiting (más restrictivo)
+    auth-rate-limit:
+      rateLimit:
+        average: 10
+        period: 1m
+        burst: 20
+    
+    # Compression
+    compress:
+      compress:
+        excludedContentTypes:
+          - "text/event-stream"
+    
+    # CORS Headers
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+          - PATCH
+        accessControlAllowOriginList:
+          - "http://localhost:3000"
+          - "http://localhost:3001"
+          - "https://lams.example.com"
+        accessControlAllowHeaders:
+          - "Content-Type"
+          - "Authorization"
+        accessControlMaxAge: 100
+        addVaryHeader: true
+    
+    # Strip Prefix
+    strip-api-prefix:
+      stripPrefix:
+        prefixes:
+          - "/api"
+    
+    # Redirect to HTTPS
+    https-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
+    
+    # IP Whitelist (ejemplo, para admin dashboard)
+    admin-whitelist:
+      ipWhiteList:
+        sourceRange:
+          - "127.0.0.1/32"
+          - "10.0.0.0/8"
+          - "172.16.0.0/12"
+          - "192.168.0.0/16"

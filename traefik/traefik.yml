@@ -1,0 +1,85 @@
+# Traefik Static Configuration
+# https://doc.traefik.io/traefik/
+
+# API and Dashboard
+api:
+  dashboard: true
+  insecure: false  # Dashboard solo accesible via HTTPS
+
+# Entry Points
+entryPoints:
+  web:
+    address: ":80"
+    # Redirect HTTP to HTTPS
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "lams.example.com"
+            sans:
+              - "*.lams.example.com"
+
+# Certificate Resolvers
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: admin@example.com  # CAMBIAR por tu email
+      storage: /letsencrypt/acme.json
+      # Usar staging para testing, production para deploy real
+      # caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"  # Staging
+      caServer: "https://acme-v02.api.letsencrypt.org/directory"  # Production
+      
+      # HTTP Challenge
+      httpChallenge:
+        entryPoint: web
+      
+      # DNS Challenge (comentado, usar si tienes DNS provider)
+      # dnsChallenge:
+      #   provider: cloudflare
+      #   delayBeforeCheck: 0
+
+# Providers
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false  # Solo exponer servicios con label traefik.enable=true
+    network: lams_default
+  
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+# Logs
+log:
+  level: INFO  # DEBUG, INFO, WARN, ERROR
+  filePath: /var/log/traefik/traefik.log
+  format: json
+
+# Access Logs
+accessLog:
+  filePath: /var/log/traefik/access.log
+  format: json
+  filters:
+    statusCodes:
+      - "400-599"  # Solo errores
+
+# Metrics (opcional, para Prometheus)
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    entryPoint: metrics
+
+# Global settings
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: false

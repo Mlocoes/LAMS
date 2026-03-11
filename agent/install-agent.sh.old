@@ -1,0 +1,56 @@
+#!/bin/bash
+set -e
+
+# LAMS Agent Installation Script
+
+SERVER_URL=""
+AGENT_TOKEN=""
+
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --server) SERVER_URL="$2"; shift ;;
+        --token) AGENT_TOKEN="$2"; shift ;;
+        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+    esac
+    shift
+done
+
+if [ -z "$SERVER_URL" ] || [ -z "$AGENT_TOKEN" ]; then
+    echo "Usage: $0 --server <URL> --token <TOKEN>"
+    exit 1
+fi
+
+echo "======================================="
+echo " Installing LAMS Agent"
+echo "======================================="
+
+echo "1. Downloading binary..."
+# curl -sL $SERVER_URL/downloads/lams-agent-linux-amd64 -o /usr/local/bin/lams-agent
+# chmod +x /usr/local/bin/lams-agent
+echo "Mock: Downloaded lams-agent to /usr/local/bin/lams-agent"
+
+echo "2. Creating systemd service..."
+cat > /tmp/lams-agent.service <<EOF
+[Unit]
+Description=LAMS Monitor Agent
+After=network.target
+
+[Service]
+Type=simple
+Environment="LAMS_SERVER_URL=$SERVER_URL"
+Environment="LAMS_AGENT_TOKEN=$AGENT_TOKEN"
+Environment="LAMS_HOST_ID=$(hostname)"
+ExecStart=/usr/local/bin/lams-agent
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# mv /tmp/lams-agent.service /etc/systemd/system/
+# systemctl daemon-reload
+# systemctl enable lams-agent
+# systemctl start lams-agent
+
+echo "Installation complete!"

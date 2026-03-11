@@ -1,0 +1,138 @@
+version: '3.8'
+
+services:
+  # Traefik Reverse Proxy
+  traefik:
+    image: traefik:v2.10
+    container_name: lams-traefik
+    restart: always
+    ports:
+      - "80:80"      # HTTP
+      - "443:443"    # HTTPS
+      - "8888:8080"  # Traefik Dashboard
+    volumes:
+      # Docker socket para auto-discovery
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Configuración estática
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      # Configuración dinámica
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      # Certificados SSL
+      - ./traefik/letsencrypt:/letsencrypt
+      # Logs
+      - ./traefik/logs:/var/log/traefik
+    environment:
+      - TZ=Europe/Madrid
+    labels:
+      - "traefik.enable=true"
+      
+      # Dashboard
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.lams.local`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.middlewares=admin-whitelist"
+    networks:
+      - lams_network
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: lams-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - lams_pg_data:/var/lib/postgresql/data
+    networks:
+      - lams_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lams"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    # No exponer puerto directamente, solo acceso interno
+
+  # FastAPI Backend Server
+  server:
+    build: 
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: lams-server
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - SECRET_KEY=${SECRET_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      traefik:
+        condition: service_healthy
+    networks:
+      - lams_network
+    labels:
+      - "traefik.enable=true"
+      
+      # HTTP Router
+      - "traefik.http.routers.lams-api.rule=Host(`api.lams.local`) || (Host(`lams.local`) && PathPrefix(`/api`))"
+      - "traefik.http.routers.lams-api.entrypoints=websecure"
+      - "traefik.http.routers.lams-api.tls=true"
+      - "traefik.http.routers.lams-api.tls.certresolver=letsencrypt"
+      
+      # Service
+      - "traefik.http.services.lams-api.loadbalancer.server.port=8000"
+      
+      # Middlewares
+      - "traefik.http.routers.lams-api.middlewares=api-rate-limit,security-headers,compress,cors-headers"
+      
+      # Health Check
+      - "traefik.http.services.lams-api.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.lams-api.loadbalancer.healthcheck.interval=30s"
+
+  # Next.js Frontend Dashboard
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lams-dashboard
+    restart: always
+    environment:
+      - NEXT_PUBLIC_API_URL=https://api.lams.local
+      - NEXT_TELEMETRY_DISABLED=1
+    depends_on:
+      - server
+      - traefik
+    networks:
+      - lams_network
+    labels:
+      - "traefik.enable=true"
+      
+      # HTTP Router
+      - "traefik.http.routers.lams-frontend.rule=Host(`lams.local`) || Host(`www.lams.local`)"
+      - "traefik.http.routers.lams-frontend.entrypoints=websecure"
+      - "traefik.http.routers.lams-frontend.tls=true"
+      - "traefik.http.routers.lams-frontend.tls.certresolver=letsencrypt"
+      
+      # Service
+      - "traefik.http.services.lams-frontend.loadbalancer.server.port=3000"
+      
+      # Middlewares
+      - "traefik.http.routers.lams-frontend.middlewares=rate-limit,security-headers,compress"
+
+networks:
+  lams_network:
+    driver: bridge
+
+volumes:
+  lams_pg_data:

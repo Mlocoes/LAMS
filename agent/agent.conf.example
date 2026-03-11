@@ -1,0 +1,20 @@
+# LAMS Agent Configuration File
+# Este archivo contiene las variables de entorno para el agente LAMS
+
+# URL del servidor central LAMS (REQUERIDO)
+LAMS_SERVER_URL=http://localhost:8000
+
+# ID único del host (REQUERIDO)
+# Si no se especifica, se generará automáticamente basado en hostname
+LAMS_HOST_ID=
+
+# Token de autenticación del agente (OPCIONAL pero recomendado en producción)
+# Debe coincidir con el token configurado en el servidor central
+LAMS_AGENT_TOKEN=
+
+# Intervalo de recolección de métricas en segundos (OPCIONAL, default: 15)
+LAMS_METRICS_INTERVAL=15
+
+# Nivel de logging (OPCIONAL, default: info)
+# Valores: debug, info, warning, error
+LAMS_LOG_LEVEL=info

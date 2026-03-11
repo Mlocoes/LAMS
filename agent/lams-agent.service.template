@@ -1,0 +1,33 @@
+[Unit]
+Description=LAMS Monitoring Agent
+Documentation=https://github.com/Mlocoes/LAMS
+After=network-online.target
+Wants=network-online.target
+# Si Docker está presente, esperar a que esté listo
+After=docker.service
+
+[Service]
+Type=simple
+User=root
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lams-agent
+
+# Archivo de configuración con variables de entorno
+EnvironmentFile=/etc/lams/agent.conf
+
+# Ejecutable del agente
+ExecStart=/usr/local/bin/lams-agent
+
+# Límites de recursos (opcional, ajustar según necesidades)
+MemoryLimit=100M
+CPUQuota=5%
+
+# Seguridad adicional (opcional)
+# NoNewPrivileges=true
+# PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
