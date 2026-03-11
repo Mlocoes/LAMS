@@ -172,4 +172,97 @@ sudo ./setup-production.sh
 
 See [docs/FASE3_1_REVERSE_PROXY.md](./docs/FASE3_1_REVERSE_PROXY.md) for detailed production setup guide.
 
+## 📊 Prometheus & Grafana Integration
+
+LAMS includes native Prometheus metrics export and Grafana dashboards for advanced monitoring and visualization.
+
+### Quick Start
+
+**1. Start monitoring stack:**
+```bash
+docker-compose up -d prometheus grafana
+```
+
+**2. Access dashboards:**
+- **Prometheus:** http://localhost:9090
+- **Grafana:** http://localhost:3002 (admin/lams2024)
+
+### Available Metrics
+
+LAMS exposes 13 metric types in Prometheus format at `/api/v1/metrics`:
+
+**Host Metrics:**
+- `lams_host_cpu_usage_percent` - CPU usage by host
+- `lams_host_memory_usage_percent` - Memory usage by host
+- `lams_host_memory_total_bytes` - Total memory in bytes
+- `lams_host_memory_used_bytes` - Used memory in bytes
+- `lams_host_disk_usage_percent` - Disk usage by host
+- `lams_host_temperature_celsius` - CPU temperature
+- `lams_host_network_receive_bytes_total` - Network bytes received (counter)
+- `lams_host_network_transmit_bytes_total` - Network bytes transmitted (counter)
+- `lams_host_up` - Host status (1=online, 0=offline)
+- `lams_host_info` - Host information and metadata
+
+**Docker Metrics:**
+- `lams_docker_container_cpu_percent` - Container CPU usage
+- `lams_docker_container_memory_bytes` - Container memory usage
+- `lams_docker_container_up` - Container status (1=running, 0=stopped)
+
+### Example Queries
+
+```promql
+# Average CPU across all hosts
+avg(lams_host_cpu_usage_percent)
+
+# Hosts with high memory usage (>80%)
+lams_host_memory_usage_percent > 80
+
+# Total network traffic rate (last 5 minutes)
+sum(rate(lams_host_network_receive_bytes_total[5m]))
+
+# Count of running Docker containers
+count(lams_docker_container_up == 1)
+
+# Top 5 containers by memory usage
+topk(5, lams_docker_container_memory_bytes)
+```
+
+### Pre-built Dashboards
+
+LAMS includes a comprehensive Grafana dashboard:
+
+**LAMS - System Overview** (`lams-system-overview`)
+- CPU Usage (timeseries per host)
+- Memory Usage (timeseries per host)
+- Disk Usage (gauge with thresholds)
+- CPU Temperature (gauge with alerts)
+- Network Traffic (RX/TX rates)
+- Docker Container CPU (all containers)
+- Docker Container Memory (all containers)
+- Variable template for host filtering
+- Auto-refresh every 30s
+
+Access at: http://localhost:3002/d/lams-system-overview
+
+### Configuration
+
+**Prometheus scraping interval:** 30 seconds  
+**Data retention:** 30 days  
+**Grafana provisioning:** Automatic on startup
+
+**Custom dashboards:** Place JSON files in `grafana/dashboards/`  
+**Additional datasources:** Add YAML to `grafana/provisioning/datasources/`
+
+### Advanced Usage
+
+For detailed query examples and best practices, see:
+- [docs/PROMETHEUS_QUERIES.md](./docs/PROMETHEUS_QUERIES.md) - Complete query guide
+- [docs/FASE4_4_PROMETHEUS_GRAFANA.md](./docs/FASE4_4_PROMETHEUS_GRAFANA.md) - Implementation details
+
+### Ports
+
+- **8080** - LAMS Backend API (includes `/api/v1/metrics`)
+- **9090** - Prometheus UI
+- **3002** - Grafana UI
+
 See the [docs/](./docs/) directory for detailed system information.
