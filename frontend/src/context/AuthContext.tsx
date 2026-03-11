@@ -25,19 +25,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem('lams_token');
-    if (stored) {
-      setToken(stored);
-      getMe()
-        .then(setUser)
-        .catch(() => {
-          localStorage.removeItem('lams_token');
-          setToken(null);
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    // Validar token al montar (reload/refresh)
+    const validateAuth = async () => {
+      const stored = localStorage.getItem('lams_token');
+      
+      // Si no hay token, ir directo al login sin mostrar "cargando"
+      if (!stored) {
+        setLoading(false);
+        return;
+      }
+
+      // Si hay token, validarlo inmediatamente con el backend
+      // Timeout de seguridad: 5 segundos máximo para validación
+      const timeoutId = setTimeout(() => {
+        console.warn('⏱️ Timeout de validación alcanzado. Redirigiendo al login...');
+        localStorage.removeItem('lams_token');
+        setToken(null);
+        setUser(null);
+        setLoading(false);
+      }, 5000);
+
+      try {
+        setToken(stored);
+        const userData = await getMe();
+        clearTimeout(timeoutId);
+        setUser(userData);
+      } catch (error) {
+        // Token inválido o expirado - limpiar y forzar login
+        clearTimeout(timeoutId);
+        console.warn('🔒 Token inválido o sesión expirada. Redirigiendo al login...');
+        localStorage.removeItem('lams_token');
+        setToken(null);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    validateAuth();
   }, []);
 
   const login = async (email: string, password: string) => {
