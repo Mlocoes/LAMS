@@ -28,6 +28,25 @@ type dockerContainerJSON struct {
 	Created int64    `json:"Created"`
 }
 
+type dockerStatsJSON struct {
+	CPUStats struct {
+		CPUUsage struct {
+			TotalUsage uint64 `json:"total_usage"`
+		} `json:"cpu_usage"`
+		SystemCPUUsage uint64 `json:"system_cpu_usage"`
+	} `json:"cpu_stats"`
+	PreCPUStats struct {
+		CPUUsage struct {
+			TotalUsage uint64 `json:"total_usage"`
+		} `json:"cpu_usage"`
+		SystemCPUUsage uint64 `json:"system_cpu_usage"`
+	} `json:"precpu_stats"`
+	MemoryStats struct {
+		Usage uint64 `json:"usage"`
+		Limit uint64 `json:"limit"`
+	} `json:"memory_stats"`
+}
+
 func getDockerClient() *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
@@ -37,6 +56,48 @@ func getDockerClient() *http.Client {
 		},
 		Timeout: 5 * time.Second,
 	}
+}
+
+// getContainerStats obtiene estadísticas en tiempo real de un contenedor
+func getContainerStats(containerID string) (float64, float64) {
+	client := getDockerClient()
+	
+	// Obtener stats con stream=false para una sola lectura
+	req, err := http.NewRequest("GET", "http://localhost/containers/"+containerID+"/stats?stream=false", nil)
+	if err != nil {
+		return 0.0, 0.0
+	}
+	
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0.0, 0.0
+	}
+	defer resp.Body.Close()
+	
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0.0, 0.0
+	}
+	
+	var stats dockerStatsJSON
+	err = json.Unmarshal(body, &stats)
+	if err != nil {
+		return 0.0, 0.0
+	}
+	
+	// Calcular CPU percentage
+	var cpuPercent float64 = 0.0
+	cpuDelta := float64(stats.CPUStats.CPUUsage.TotalUsage - stats.PreCPUStats.CPUUsage.TotalUsage)
+	systemDelta := float64(stats.CPUStats.SystemCPUUsage - stats.PreCPUStats.SystemCPUUsage)
+	
+	if systemDelta > 0.0 && cpuDelta > 0.0 {
+		cpuPercent = (cpuDelta / systemDelta) * 100.0
+	}
+	
+	// Memoria en MB
+	memoryUsageMB := float64(stats.MemoryStats.Usage) / 1024 / 1024
+	
+	return cpuPercent, memoryUsageMB
 }
 
 // GetDockerContainers returns a list of containers if docker is running
@@ -70,13 +131,19 @@ func GetDockerContainers() []DockerContainerData {
 			name = c.Names[0][1:] // Remove leading slash
 		}
 
+		// Obtener estadísticas solo para contenedores en ejecución
+		var cpuPercent, memoryUsage float64
+		if c.State == "running" {
+			cpuPercent, memoryUsage = getContainerStats(c.Id)
+		}
+
 		result = append(result, DockerContainerData{
 			ID:          c.Id[:12],
 			Name:        name,
 			Image:       c.Image,
 			State:       c.State,
-			CPUPercent:  0.0, // Collecting precise docker stats takes more requests. Keeping it at 0 for speed initially.
-			MemoryUsage: 0.0,
+			CPUPercent:  cpuPercent,
+			MemoryUsage: memoryUsage,
 			CreatedAt:   time.Unix(c.Created, 0).UTC(),
 		})
 	}
