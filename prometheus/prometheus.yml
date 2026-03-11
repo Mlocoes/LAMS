@@ -1,0 +1,29 @@
+# Prometheus Configuration for LAMS
+# Scrapes metrics from LAMS backend every 30 seconds
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  external_labels:
+    cluster: 'lams'
+    environment: 'production'
+
+# Scrape configurations
+scrape_configs:
+  # LAMS Backend metrics endpoint
+  - job_name: 'lams-backend'
+    static_configs:
+      - targets: ['server:8000']
+        labels:
+          service: 'lams-api'
+          component: 'backend'
+    metrics_path: '/api/v1/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
