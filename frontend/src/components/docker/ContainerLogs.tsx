@@ -44,7 +44,7 @@ export function ContainerLogs({
         `${apiUrl}/api/v1/containers/${hostId}/containers/${containerId}/logs?tail=1000`,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('lams_token')}`
           }
         }
       );

@@ -36,7 +36,7 @@ export function ContainerInspect({
         `${apiUrl}/api/v1/containers/${hostId}/containers/${containerId}/inspect`,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('lams_token')}`
           }
         }
       );
