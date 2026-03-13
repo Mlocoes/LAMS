@@ -1,8 +1,10 @@
 package collector
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -148,6 +150,161 @@ func GetDockerContainers() []DockerContainerData {
 		})
 	}
 	return result
+}
+
+// ============================================================================
+// PORTAINER FEATURES - Extended Docker Operations
+// ============================================================================
+
+// GetContainerLogs fetches logs from a container
+func GetContainerLogs(containerID string, tail int, since int64) ([]string, error) {
+	client := getDockerClient()
+	
+	// Build URL with parameters
+	url := fmt.Sprintf("http://localhost/containers/%s/logs?stdout=true&stderr=true&timestamps=false&tail=%d", containerID, tail)
+	if since > 0 {
+		url += fmt.Sprintf("&since=%d", since)
+	}
+	
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get logs: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("docker API error: %s", string(body))
+	}
+	
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+	
+	// Docker logs come with a header (8 bytes per line)
+	// Format: [stream_type (1 byte)][padding (3 bytes)][size (4 bytes)][message]
+	// We'll strip the headers and extract just the messages
+	logs := []string{}
+	offset := 0
+	for offset < len(body) {
+		if offset+8 > len(body) {
+			break
+		}
+		
+		// Read the size (big-endian uint32 at bytes 4-7)
+		size := int(body[offset+4])<<24 | int(body[offset+5])<<16 | int(body[offset+6])<<8 | int(body[offset+7])
+		offset += 8
+		
+		if offset+size > len(body) {
+			break
+		}
+		
+		logLine := string(body[offset : offset+size])
+		logs = append(logs, logLine)
+		offset += size
+	}
+	
+	return logs, nil
+}
+
+// InspectContainer returns detailed information about a container
+func InspectContainer(containerID string) (map[string]interface{}, error) {
+	client := getDockerClient()
+	
+	url := fmt.Sprintf("http://localhost/containers/%s/json", containerID)
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to inspect container: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("docker API error: %s", string(body))
+	}
+	
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+	
+	var inspectData map[string]interface{}
+	err = json.Unmarshal(body, &inspectData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse inspect data: %w", err)
+	}
+	
+	return inspectData, nil
+}
+
+// RemoveContainer removes a container with options
+func RemoveContainer(containerID string, force bool, volumes bool) error {
+	client := getDockerClient()
+	
+	url := fmt.Sprintf("http://localhost/containers/%s?force=%t&v=%t", containerID, force, volumes)
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to remove container: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("docker API error: %s", string(body))
+	}
+	
+	return nil
+}
+
+// ExecCreate creates an exec instance in a container
+func ExecCreate(containerID string, cmd []string, tty bool) (string, error) {
+	client := getDockerClient()
+	
+	execConfig := map[string]interface{}{
+		"AttachStdin":  true,
+		"AttachStdout": true,
+		"AttachStderr": true,
+		"Tty":          tty,
+		"Cmd":          cmd,
+	}
+	
+	body, err := json.Marshal(execConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal exec config: %w", err)
+	}
+	
+	url := fmt.Sprintf("http://localhost/containers/%s/exec", containerID)
+	resp, err := client.Post(url, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("failed to create exec: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusCreated {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("docker API error: %s", string(respBody))
+	}
+	
+	var result struct {
+		ID string `json:"Id"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode response: %w", err)
+	}
+	
+	return result.ID, nil
 }
 
 // StartContainer starts a Docker container by ID

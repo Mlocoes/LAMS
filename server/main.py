@@ -163,6 +163,11 @@ async def block_docs_in_production(request: Request, call_next):
 # API Routers
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
+# WebSocket routers (Portainer features)
+from api import websocket_logs, websocket_console
+app.include_router(websocket_logs.router, prefix=settings.API_V1_STR)
+app.include_router(websocket_console.router, prefix=settings.API_V1_STR)
+
 # Prometheus metrics endpoint (no prefix, accessible at /api/v1/metrics)
 app.include_router(prometheus_api.router, prefix=settings.API_V1_STR)
 

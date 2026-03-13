@@ -277,6 +277,14 @@ class DockerContainer(Base):
     memory_usage = Column(Float)
     created_at = Column(DateTime(timezone=True))
     last_updated = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    
+    # Extended fields for Portainer features
+    ports = Column(JSON, nullable=True)  # Port mappings
+    volumes = Column(JSON, nullable=True)  # Volume mounts
+    networks = Column(JSON, nullable=True)  # Connected networks
+    labels = Column(JSON, nullable=True)  # Container labels
+    restart_policy = Column(String(64), nullable=True)  # Restart policy
+    exit_code = Column(Integer, nullable=True)  # Exit code if stopped
 
     host = relationship("Host", back_populates="docker_containers")
 
@@ -297,11 +305,16 @@ class RemoteCommand(Base):
     __tablename__ = "remote_commands"
     id = Column(Integer, primary_key=True, index=True)
     host_id = Column(String, ForeignKey("hosts.id"), index=True, nullable=False)
-    command_type = Column(String, nullable=False)  # "docker_start", "docker_stop", "docker_restart"
+    command_type = Column(String, nullable=False)  # "docker_start", "docker_stop", "docker_restart", "container.logs", "container.inspect", etc.
     target_id = Column(String, nullable=False)  # container_id
+    parameters = Column(JSON, nullable=True)  # Additional parameters for the command
     status = Column(String, default="pending", nullable=False)  # "pending", "executing", "completed", "failed"
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     executed_at = Column(DateTime(timezone=True), nullable=True)
-    result = Column(Text, nullable=True)  # Success message or error details
+    result = Column(JSON, nullable=True)  # Result data (was Text, now JSON for structured data)
+    error_message = Column(Text, nullable=True)  # Error details if failed
+    duration_ms = Column(Integer, nullable=True)  # Command execution time in milliseconds
+    retry_count = Column(Integer, default=0, nullable=False)  # Number of retries attempted
+    max_retries = Column(Integer, default=0, nullable=False)  # Maximum retries allowed
     
     host = relationship("Host", back_populates="remote_commands")

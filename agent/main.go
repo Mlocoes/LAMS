@@ -45,19 +45,21 @@ type DockerSyncPayload struct {
 }
 
 type RemoteCommand struct {
-	ID          int       `json:"id"`
-	HostID      string    `json:"host_id"`
-	CommandType string    `json:"command_type"`
-	TargetID    string    `json:"target_id"`
-	Status      string    `json:"status"`
-	CreatedAt   string    `json:"created_at"`
-	ExecutedAt  *string   `json:"executed_at"`
-	Result      *string   `json:"result"`
+	ID          int                    `json:"id"`
+	HostID      string                 `json:"host_id"`
+	CommandType string                 `json:"command_type"`
+	TargetID    string                 `json:"target_id"`
+	Parameters  map[string]interface{} `json:"parameters"`
+	Status      string                 `json:"status"`
+	CreatedAt   string                 `json:"created_at"`
+	ExecutedAt  *string                `json:"executed_at"`
+	Result      interface{}            `json:"result"`
 }
 
 type CommandResult struct {
-	Status string `json:"status"`
-	Result string `json:"result"`
+	Status string      `json:"status"`
+	Result interface{} `json:"result"`
+	Error  string      `json:"error,omitempty"`
 }
 
 func main() {
@@ -285,8 +287,7 @@ func pollCommands(url, token, hostID string) []RemoteCommand {
 
 // executeCommand executes a single remote command
 func executeCommand(cmd RemoteCommand) CommandResult {
-	var err error
-	var result string
+	var err errinterface{}
 
 	log.Printf("Executing command: %s on target %s", cmd.CommandType, cmd.TargetID)
 
@@ -306,6 +307,79 @@ func executeCommand(cmd RemoteCommand) CommandResult {
 		if err == nil {
 			result = fmt.Sprintf("Container %s restarted successfully", cmd.TargetID)
 		}
+	
+	// ============================================================================
+	// PORTAINER FEATURES - Extended container operations
+	// ============================================================================
+	case "container.logs":
+		tail := 100
+		var since int64 = 0
+		
+		if cmd.Parameters != nil {
+			if t, ok := cmd.Parameters["tail"].(float64); ok {
+				tail = int(t)
+			}
+			if s, ok := cmd.Parameters["since"].(float64); ok {
+				since = int64(s)
+			}
+		}
+		
+		logs, err := collector.GetContainerLogs(cmd.TargetID, tail, since)
+		if err == nil {
+			result = map[string]interface{}{
+				"logs": logs,
+			}
+		}
+	
+	case "container.inspect":
+		inspectData, err := collector.InspectContainer(cmd.TargetID)
+		if err == nil {
+			result = map[string]interface{}{
+				"inspect": inspectData,
+			}
+		}
+	
+	case "container.remove":
+		force := false
+		volumes := false
+		
+		if cmd.Parameters != nil {
+			if f, ok := cmd.Parameters["force"].(bool); ok {
+				force = f
+			}
+			if v, ok := cmd.Parameters["volumes"].(bool); ok {
+				volumes = v
+			}
+		}
+		
+		err = collector.RemoveContainer(cmd.TargetID, force, volumes)
+		if err == nil {
+			result = fmt.Sprintf("Container %s removed successfully (force=%t, volumes=%t)", cmd.TargetID, force, volumes)
+		}
+	
+	case "container.exec.create":
+		cmdToExec := []string{"/bin/sh"}
+		tty := true
+		
+		if cmd.Parameters != nil {
+			if c, ok := cmd.Parameters["cmd"].([]interface{}); ok {
+				cmdToExec = make([]string, len(c))
+				for i, v := range c {
+					cmdToExec[i] = fmt.Sprint(v)
+				}
+			}
+			if t, ok := cmd.Parameters["tty"].(bool); ok {
+				tty = t
+			}
+		}
+		
+		execID, err := collector.ExecCreate(cmd.TargetID, cmdToExec, tty)
+		if err == nil {
+			result = map[string]interface{}{
+				"exec_id": execID,
+			}
+		}
+	
 	default:
 		err = fmt.Errorf("unknown command type: %s", cmd.CommandType)
 	}
@@ -313,6 +387,7 @@ func executeCommand(cmd RemoteCommand) CommandResult {
 	if err != nil {
 		return CommandResult{
 			Status: "failed",
+			Error:  "failed",
 			Result: fmt.Sprintf("Error: %v", err),
 		}
 	}

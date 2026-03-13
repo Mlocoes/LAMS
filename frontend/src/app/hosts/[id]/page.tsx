@@ -15,6 +15,10 @@ import {
   DockerContainer
 } from '@/lib/api';
 import { MetricChart } from '@/components/MetricChart';
+import { ContainerLogs } from '@/components/docker/ContainerLogs';
+import { ContainerInspect } from '@/components/docker/ContainerInspect';
+import { DeleteContainer } from '@/components/docker/DeleteContainer';
+import { ContainerConsole } from '@/components/docker/ContainerConsole';
 
 export default function HostDetailPage() {
   const { user, token } = useAuth();
@@ -29,6 +33,11 @@ export default function HostDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [timeRange, setTimeRange] = useState<'1h' | '6h' | '24h' | '7d'>('6h');
+  const [selectedContainer, setSelectedContainer] = useState<DockerContainer | null>(null);
+  const [showLogs, setShowLogs] = useState(false);
+  const [showInspect, setShowInspect] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [showConsole, setShowConsole] = useState(false);
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -439,12 +448,12 @@ export default function HostDetailPage() {
                       <td style={tableCellStyle}>{container.cpu_percent.toFixed(1)}%</td>
                       <td style={tableCellStyle}>{(container.memory_usage / 1024 / 1024).toFixed(0)} MB</td>
                       <td style={tableCellStyle}>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                           {container.state !== 'running' && (
                             <ActionButton 
                               onClick={() => handleDockerAction(container.id, 'start')}
                               color="#10b981"
-                              label="Start"
+                              label="▶ Start"
                             />
                           )}
                           {container.state === 'running' && (
@@ -452,15 +461,49 @@ export default function HostDetailPage() {
                               <ActionButton 
                                 onClick={() => handleDockerAction(container.id, 'stop')}
                                 color="#ef4444"
-                                label="Stop"
+                                label="■ Stop"
                               />
                               <ActionButton 
                                 onClick={() => handleDockerAction(container.id, 'restart')}
                                 color="#f59e0b"
-                                label="Restart"
+                                label="🔄 Restart"
                               />
                             </>
                           )}
+                          <ActionButton 
+                            onClick={() => {
+                              setSelectedContainer(container);
+                              setShowLogs(true);
+                            }}
+                            color="#667eea"
+                            label="📋 Logs"
+                          />
+                          <ActionButton 
+                            onClick={() => {
+                              setSelectedContainer(container);
+                              setShowInspect(true);
+                            }}
+                            color="#06b6d4"
+                            label="🔍 Inspect"
+                          />
+                          {container.state === 'running' && (
+                            <ActionButton 
+                              onClick={() => {
+                                setSelectedContainer(container);
+                                setShowConsole(true);
+                              }}
+                              color="#10b981"
+                              label="💻 Console"
+                            />
+                          )}
+                          <ActionButton 
+                            onClick={() => {
+                              setSelectedContainer(container);
+                              setShowDelete(true);
+                            }}
+                            color="#ef4444"
+                            label="🗑️ Delete"
+                          />
                         </div>
                       </td>
                     </tr>
@@ -536,6 +579,59 @@ export default function HostDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Docker Container Modals */}
+      {showLogs && selectedContainer && (
+        <ContainerLogs
+          hostId={hostId}
+          containerId={selectedContainer.id}
+          containerName={selectedContainer.name}
+          onClose={() => {
+            setShowLogs(false);
+            setSelectedContainer(null);
+          }}
+        />
+      )}
+
+      {showInspect && selectedContainer && (
+        <ContainerInspect
+          hostId={hostId}
+          containerId={selectedContainer.id}
+          containerName={selectedContainer.name}
+          onClose={() => {
+            setShowInspect(false);
+            setSelectedContainer(null);
+          }}
+        />
+      )}
+
+      {showDelete && selectedContainer && (
+        <DeleteContainer
+          hostId={hostId}
+          containerId={selectedContainer.id}
+          containerName={selectedContainer.name}
+          containerStatus={selectedContainer.state}
+          onClose={() => {
+            setShowDelete(false);
+            setSelectedContainer(null);
+          }}
+          onSuccess={() => {
+            fetchData(); // Refresh container list
+          }}
+        />
+      )}
+
+      {showConsole && selectedContainer && (
+        <ContainerConsole
+          hostId={hostId}
+          containerId={selectedContainer.id}
+          containerName={selectedContainer.name}
+          onClose={() => {
+            setShowConsole(false);
+            setSelectedContainer(null);
+          }}
+        />
+      )}
     </div>
   );
 }

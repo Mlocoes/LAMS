@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from api import auth, hosts, metrics, alerts, docker, alert_rules, notifications, commands, users, maintenance, agents, sessions, mfa, keys
+from api import auth, hosts, metrics, alerts, docker, alert_rules, notifications, commands, users, maintenance, agents, sessions, mfa, keys, containers_extended
 
 api_router = APIRouter()
 
@@ -12,6 +12,7 @@ api_router.include_router(hosts.router, prefix="/hosts", tags=["hosts"])
 api_router.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
 api_router.include_router(alerts.router, prefix="/alerts", tags=["alerts"])
 api_router.include_router(docker.router, prefix="/docker", tags=["docker"])
+api_router.include_router(containers_extended.router, prefix="/containers", tags=["containers"])  # Portainer features
 api_router.include_router(alert_rules.router, prefix="/alert-rules", tags=["alert-rules"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(commands.router, prefix="/commands", tags=["commands"])
