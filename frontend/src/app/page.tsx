@@ -29,6 +29,10 @@ import {
 import { MetricChart } from '@/components/MetricChart';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { exportMetricsToCSV, exportHostsToCSV, exportAlertsToCSV } from '@/lib/export';
+import { ContainerLogs } from '@/components/docker/ContainerLogs';
+import { ContainerInspect } from '@/components/docker/ContainerInspect';
+import { DeleteContainer } from '@/components/docker/DeleteContainer';
+import { ContainerConsole } from '@/components/docker/ContainerConsole';
 
 /* ─── Login screen ─────────────────────────────────────────────── */
 function LoginScreen() {
@@ -1437,6 +1441,13 @@ function DockerPage() {
   const [containers, setContainers] = useState<import('@/lib/api').DockerContainer[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  
+  // Sprint 1: Modal states
+  const [showLogs, setShowLogs] = useState(false);
+  const [showInspect, setShowInspect] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [showConsole, setShowConsole] = useState(false);
+  const [selectedContainer, setSelectedContainer] = useState<import('@/lib/api').DockerContainer | null>(null);
 
   const loadContainers = useCallback(async () => {
     if (!selectedHost) return;
@@ -1761,6 +1772,109 @@ function DockerPage() {
                           </button>
                         </>
                       )}
+                      {/* Sprint 1: Advanced controls */}
+                      <button
+                        onClick={() => {
+                          setSelectedContainer(c);
+                          setShowLogs(true);
+                        }}
+                        style={{ 
+                          padding: '0.35rem 0.65rem',
+                          fontSize: '0.7rem',
+                          fontWeight: 700,
+                          border: '1px solid #667eea',
+                          background: 'rgba(102, 126, 234, 0.15)',
+                          color: '#667eea',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(102, 126, 234, 0.25)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(102, 126, 234, 0.15)'}
+                      >
+                        📋 LOGS
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedContainer(c);
+                          setShowInspect(true);
+                        }}
+                        style={{ 
+                          padding: '0.35rem 0.65rem',
+                          fontSize: '0.7rem',
+                          fontWeight: 700,
+                          border: '1px solid #06b6d4',
+                          background: 'rgba(6, 182, 212, 0.15)',
+                          color: '#06b6d4',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(6, 182, 212, 0.25)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(6, 182, 212, 0.15)'}
+                      >
+                        🔍 INSPECT
+                      </button>
+                      {c.state === 'running' && (
+                        <button
+                          onClick={() => {
+                            setSelectedContainer(c);
+                            setShowConsole(true);
+                          }}
+                          style={{ 
+                            padding: '0.35rem 0.65rem',
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                            border: '1px solid #10b981',
+                            background: 'rgba(16, 185, 129, 0.15)',
+                            color: '#10b981',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                            whiteSpace: 'nowrap'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.25)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)'}
+                        >
+                          💻 CONSOLE
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setSelectedContainer(c);
+                          setShowDelete(true);
+                        }}
+                        style={{ 
+                          padding: '0.35rem 0.65rem',
+                          fontSize: '0.7rem',
+                          fontWeight: 700,
+                          border: '1px solid #ef4444',
+                          background: 'rgba(239, 68, 68, 0.15)',
+                          color: '#ef4444',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                      >
+                        🗑️ DELETE
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1769,6 +1883,59 @@ function DockerPage() {
           </table>
         </div>
         </div>
+      )}
+      
+      {/* Sprint 1: Docker Container Modals */}
+      {showLogs && selectedContainer && (
+        <ContainerLogs
+          hostId={selectedHost}
+          containerId={selectedContainer.id}
+          containerName={selectedContainer.name}
+          onClose={() => {
+            setShowLogs(false);
+            setSelectedContainer(null);
+          }}
+        />
+      )}
+
+      {showInspect && selectedContainer && (
+        <ContainerInspect
+          hostId={selectedHost}
+          containerId={selectedContainer.id}
+          containerName={selectedContainer.name}
+          onClose={() => {
+            setShowInspect(false);
+            setSelectedContainer(null);
+          }}
+        />
+      )}
+
+      {showDelete && selectedContainer && (
+        <DeleteContainer
+          hostId={selectedHost}
+          containerId={selectedContainer.id}
+          containerName={selectedContainer.name}
+          containerStatus={selectedContainer.state}
+          onClose={() => {
+            setShowDelete(false);
+            setSelectedContainer(null);
+          }}
+          onSuccess={() => {
+            loadContainers(); // Refresh container list
+          }}
+        />
+      )}
+
+      {showConsole && selectedContainer && (
+        <ContainerConsole
+          hostId={selectedHost}
+          containerId={selectedContainer.id}
+          containerName={selectedContainer.name}
+          onClose={() => {
+            setShowConsole(false);
+            setSelectedContainer(null);
+          }}
+        />
       )}
     </div>
   );
